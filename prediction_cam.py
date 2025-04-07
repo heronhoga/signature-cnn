@@ -2,8 +2,39 @@ import cv2
 import tensorflow as tf
 import numpy as np
 
-# Load your trained model
-model = tf.keras.models.load_model('without_augmentation.keras')
+def iou_loss(y_true, y_pred):
+    cx_true, cy_true, w_true, h_true = tf.split(y_true, 4, axis=-1)
+    cx_pred, cy_pred, w_pred, h_pred = tf.split(y_pred, 4, axis=-1)
+
+    x1_true = cx_true - w_true / 2.0
+    y1_true = cy_true - h_true / 2.0
+    x2_true = cx_true + w_true / 2.0
+    y2_true = cy_true + h_true / 2.0
+
+    x1_pred = cx_pred - w_pred / 2.0
+    y1_pred = cy_pred - h_pred / 2.0
+    x2_pred = cx_pred + w_pred / 2.0
+    y2_pred = cy_pred + h_pred / 2.0
+
+    x1_inter = tf.maximum(x1_true, x1_pred)
+    y1_inter = tf.maximum(y1_true, y1_pred)
+    x2_inter = tf.minimum(x2_true, x2_pred)
+    y2_inter = tf.minimum(y2_true, y2_pred)
+
+    inter_area = tf.maximum(0.0, x2_inter - x1_inter) * tf.maximum(0.0, y2_inter - y1_inter)
+
+    true_area = (x2_true - x1_true) * (y2_true - y1_true)
+    pred_area = (x2_pred - x1_pred) * (y2_pred - y1_pred)
+    union_area = true_area + pred_area - inter_area
+
+
+    iou = inter_area / (union_area + 1e-6)
+
+    # IoU loss = 1 - IoU
+    return 1.0 - tf.squeeze(iou, axis=-1)
+
+# Load trained model
+model = tf.keras.models.load_model('cnn_signature_model_v1.keras')
 
 # Open webcam
 cap = cv2.VideoCapture(0)
@@ -59,9 +90,6 @@ while True:
 
         # Show result
         cv2.imshow("Detected Signature", frame)
-
-        # Optionally save image
-        # cv2.imwrite("signature_detected.jpg", frame)
 
         cv2.waitKey(0)  # Wait until a key is pressed before going back to live view
 
